@@ -1,7 +1,6 @@
 package zabbix
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -9,12 +8,20 @@ type ZBXBoolean bool
 
 func (bit *ZBXBoolean) UnmarshalJSON(data []byte) error {
 	asString := string(data)
-	if asString == "1" || asString == "true" {
+	switch asString {
+	case "1", "true":
 		*bit = true
-	} else if asString == "0" || asString == "false" {
+	case "0", "false":
 		*bit = false
-	} else {
-		return errors.New(fmt.Sprintf("Boolean unmarshal error: invalid input %s", asString))
+	default:
+		return fmt.Errorf("Boolean unmarshal error: invalid input %s", asString)
 	}
 	return nil
+}
+
+func (bit *ZBXBoolean) MarshalJSON() ([]byte, error) {
+	if *bit {
+		return []byte("\"1\""), nil
+	}
+	return []byte("\"0\""), nil
 }

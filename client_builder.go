@@ -1,6 +1,9 @@
 package zabbix
 
-import "net/http"
+import (
+	"fmt"
+	"net/http"
+)
 
 // ClientBuilder is Zabbix API client builder
 type ClientBuilder struct {
@@ -8,6 +11,7 @@ type ClientBuilder struct {
 	hasCache    bool
 	url         string
 	credentials map[string]string
+	token       string
 	client      *http.Client
 }
 
@@ -23,6 +27,13 @@ func (builder *ClientBuilder) WithCache(cache SessionAbstractCache) *ClientBuild
 func (builder *ClientBuilder) WithCredentials(username string, password string) *ClientBuilder {
 	builder.credentials["username"] = username
 	builder.credentials["password"] = password
+
+	return builder
+}
+
+// WithToken sets Token for Zabbix API
+func (builder *ClientBuilder) WithToken(token string) *ClientBuilder {
+	builder.token = token
 
 	return builder
 }
@@ -46,11 +57,21 @@ func (builder *ClientBuilder) Connect() (session *Session, err error) {
 	}
 
 	// Otherwise - login to a Zabbix server
-	session = &Session{URL: builder.url, client: builder.client}
-	err = session.login(builder.credentials["username"], builder.credentials["password"])
+	if builder.token == "" {
+		session = &Session{URL: builder.url, client: builder.client}
 
-	if err != nil {
-		return nil, err
+		err = session.login(builder.credentials["username"], builder.credentials["password"], "")
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		session = &Session{URL: builder.url, client: builder.client, Token: builder.token}
+
+		// get Zabbix API version
+		_, err = session.GetVersion()
+		if err != nil {
+			return nil, fmt.Errorf("Failed to retrieve Zabbix API version: %v", err)
+		}
 	}
 
 	// Try to cache session if any cache used
@@ -66,6 +87,7 @@ func CreateClient(apiEndpoint string) *ClientBuilder {
 	return &ClientBuilder{
 		url:         apiEndpoint,
 		credentials: make(map[string]string),
+		token:       "",
 		client:      &http.Client{},
 	}
 }

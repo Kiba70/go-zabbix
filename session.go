@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strconv"
+	"strings"
 )
 
 // ErrNotFound describes an empty result set for an API call.
@@ -24,8 +26,15 @@ type Session struct {
 
 	// ApiVersion is the software version string of the connected Zabbix API.
 	APIVersion string `json:"apiVersion"`
+	ApiVersion APIVersion
 
 	client *http.Client
+}
+
+type APIVersion struct {
+	Major int
+	Minor int
+	Build int
 }
 
 // NewSession returns a new Session given an API connection URL and an API
@@ -36,23 +45,48 @@ type Session struct {
 //
 // The authentication token returned by the Zabbix API server is cached to
 // authenticate all subsequent requests in this Session.
-func NewSession(url string, username string, password string) (session *Session, err error) {
+func NewSession(url, username, password, token string) (session *Session, err error) {
 	// create session
 	session = &Session{URL: url}
-	err = session.login(username, password)
+	err = session.login(username, password, token)
 	return
 }
 
-func (c *Session) login(username, password string) error {
+// NewSessionToken returns a new Session given an API connection URL and an API Token
+//
+// An error is returned if there was an HTTP protocol error, the API credentials
+// are incorrect or if the API version is indeterminable.
+//
+// The authentication token returned by the Zabbix API server is cached to
+// authenticate all subsequent requests in this Session.
+func NewSessionToken(url string, token string) (session *Session, err error) {
+	// create session
+	session = &Session{URL: url, Token: token}
+
+	// get Zabbix API version
+	_, err = session.GetVersion()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to retrieve Zabbix API version: %v", err)
+	}
+
+	return
+}
+
+func (c *Session) login(username, password, token string) error {
 	// get Zabbix API version
 	_, err := c.GetVersion()
 	if err != nil {
 		return fmt.Errorf("Failed to retrieve Zabbix API version: %v", err)
 	}
 
+	if token != "" {
+		c.Token = token
+		return nil
+	}
+
 	// login to API
 	params := map[string]string{
-		"user":     username,
+		"username": username,
 		"password": password,
 	}
 
@@ -82,6 +116,11 @@ func (c *Session) GetVersion() (string, error) {
 		if err != nil {
 			return "", err
 		}
+
+		versions := strings.Split(c.APIVersion, ".")
+		c.ApiVersion.Major, _ = strconv.Atoi(versions[0])
+		c.ApiVersion.Minor, _ = strconv.Atoi(versions[1])
+		c.ApiVersion.Build, _ = strconv.Atoi(versions[2])
 	}
 	return c.APIVersion, nil
 }
@@ -90,6 +129,11 @@ func (c *Session) GetVersion() (string, error) {
 // authentication all API calls.
 func (c *Session) AuthToken() string {
 	return c.Token
+}
+
+// Set new API Token for session
+func (c *Session) SetToken(token string) {
+	c.Token = token
 }
 
 // Do sends a JSON-RPC request and returns an API Response, using connection

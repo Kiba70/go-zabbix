@@ -8,7 +8,7 @@ import (
 // JMaintenance is a private map for the Zabbix API Maintenance object.
 // See: https://www.zabbix.com/documentation/2.2/manual/api/reference/maintenance/object
 type JMaintenance struct {
-	MaintenanceID   string `json:"maintenanceid"`
+	MaintenanceID   string `json:"maintenanceid,omitempty"`
 	Name            string `json:"name,omitempty"`
 	ActiveSince     int64  `json:"active_since,string,omitempty"`
 	ActiveTill      int64  `json:"active_till,string,omitempty"`
@@ -37,16 +37,24 @@ type jMaintenanceTags []jMaintenanceTag
 // Timeperiods is a private map for the Zabbix API Maintenance object.
 // See: https://www.zabbix.com/documentation/2.2/manual/api/reference/maintenance/object
 type jTimeperiod struct {
-	TimeperiodId   int   `json:"timeperiodid,string"`
-	Day            int   `json:"day,string"`
-	Dayofweek      int   `json:"dayofweek,string"`
-	Every          int   `json:"every,string"`
-	Month          int   `json:"month,string"`
-	Period         int   `json:"period,string"`
-	StartDate      int64 `json:"start_date,string"`
-	StartTime      int   `json:"start_time,string"`
-	TimeperiodType int   `json:"timeperiod_type,string"`
+	TimeperiodId   int   `json:"timeperiodid,omitempty"`
+	Day            int   `json:"day,omitempty"`
+	Dayofweek      int   `json:"dayofweek,omitempty"`
+	Every          int   `json:"every,omitempty"`
+	Month          int   `json:"month,omitempty"`
+	Period         int   `json:"period,omitempty"`
+	StartDate      int64 `json:"start_date,omitempty"`
+	StartTime      int   `json:"start_time,omitempty"`
+	TimeperiodType int   `json:"timeperiod_type,omitempty"`
 }
+
+// type jGroups60 struct {
+// 	Groupid string `json:"groupid,omitempty"`
+// }
+
+// type jHosts60 struct {
+// 	Groupid string `json:"groupid,omitempty"`
+// }
 
 type jTimeperiods []jTimeperiod
 

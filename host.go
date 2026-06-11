@@ -58,6 +58,9 @@ type Host struct {
 	// constants.
 	Source int `json:"flags,string,omitempty"`
 
+	// Статус хоста
+	Status int `json:"status,string,omitempty"`
+
 	// Macros contains all Host Macros assigned to the Host.
 	Macros []HostMacro `json:"macros,omitempty"`
 
@@ -79,7 +82,7 @@ type Host struct {
 	MaintenanceID     string    `json:"maintenanceid,omitempty"`
 	MaintenanceType   string    `json:"maintenance_type,omitempty"`
 	MaintenanceFrom   string    `json:"maintenance_from,omitempty"`
-	InventoryMode     int    `json:"inventory_mode,omitempty"`
+	InventoryMode     int       `json:"inventory_mode,string,omitempty"`
 	Inventory         inventory `json:"inventory,omitempty"`
 
 	// Description of host

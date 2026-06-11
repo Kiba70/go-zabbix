@@ -8,10 +8,11 @@ import (
 // jHost is a private map for the Zabbix API Host object.
 // See: https://www.zabbix.com/documentation/2.2/manual/api/reference/host/object
 type jHost struct {
-	HostID   string      `json:"hostid"`
-	Hostname string      `json:"host"`
+	HostID   string      `json:"hostid,omitempty"`
+	Hostname string      `json:"host,omitempty"`
 	Flags    int         `json:"flags,string,omitempty"`
 	Name     string      `json:"name,omitempty"`
+	Status   int         `json:"status,string,omitempty"`
 	Macros   []HostMacro `json:"macros,omitempty"`
 	Groups   []Hostgroup `json:"groups,omitempty"`
 }
@@ -26,6 +27,7 @@ func (c *jHost) Host() (*Host, error) {
 	host.DisplayName = c.Name
 	host.Macros = c.Macros
 	host.Groups = c.Groups
+	host.Status = c.Status
 	/*
 		host.Source, err = strconv.Atoi(c.Flags)
 		if err != nil {

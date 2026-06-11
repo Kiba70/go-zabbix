@@ -143,12 +143,16 @@ type MaintenanceCreateParams struct {
 type jMaintenanceCreateParams struct {
 	JMaintenance
 
-	Groupids []string `json:"groupids,omitempty"`
+	Groupids []string `json:"groupids,omitempty"` // Только до версии 6.0
 	// Hosts name
-	HostNames   []string          `json:"-,omitempty"`
-	HostIDs     []string          `json:"hostids,omitempty"`
+	HostNames   []string          `json:"-,omitempty"`       // Только до версии 6.0
+	HostIDs     []string          `json:"hostids,omitempty"` // Только до версии 6.0
 	Timeperiods []jTimeperiod     `json:"timeperiods,omitempty"`
 	Tags        []jMaintenanceTag `json:"tags,omitempty"`
+
+	// Добавлено для Zabbix 6.0
+	Groups jHostgroups `json:"groups,omitempty"`
+	Hosts  jHosts      `json:"hosts,omitempty"`
 }
 
 type MaintenanceCreateResponse struct {
@@ -190,18 +194,16 @@ func (m *Maintenance) Create() (response MaintenanceCreateResponse, err error) {
 	newM.Description = m.Description
 	newM.MaintenanceType = int(m.Type)
 	newM.TagsEvaltype = int(m.ActionEvalTypeAndOr)
-	for _, host := range m.Hosts {
-		newM.HostNames = append(newM.HostNames, host.Hostname)
-	}
+
 	for _, tp := range m.Timeperiods {
 		t := jTimeperiod{}
 		switch tp.TimeperiodType {
 		case 0:
-			t.TimeperiodId = 0
-			t.Day = 0
-			t.Dayofweek = 0
-			t.Every = 1 // Нельзя указывать 0
-			t.Month = 0
+			// t.TimeperiodId = 0
+			// t.Day = 0
+			// t.Dayofweek = 0
+			// t.Every = 1 // Нельзя указывать 0
+			// t.Month = 0
 			t.Period = int(tp.Period.Seconds())
 			t.StartDate = tp.StartDate.Unix()
 			t.StartTime = tp.StartTime
@@ -215,6 +217,20 @@ func (m *Maintenance) Create() (response MaintenanceCreateResponse, err error) {
 		newM.Tags = append(newM.Tags, t)
 	}
 
+	switch m.Session.ApiVersion.Major {
+	case 4, 5:
+		for _, host := range m.Hosts {
+			newM.HostNames = append(newM.HostNames, host.Hostname)
+		}
+	case 6:
+		for _, host := range m.Hosts {
+			jHost := &jHost{}
+			jHost.Hostname = host.Hostname
+			newM.Hosts = append(newM.Hosts, *jHost)
+		}
+	}
+
+	// Заполняем HostID на основе заполненных выше имён хостов
 	if err = newM.FillHostIDs(m.Session); err != nil {
 		return
 	}
@@ -257,9 +273,6 @@ func (m *Maintenance) Update() (response MaintenanceCreateResponse, err error) {
 	if m.ActionEvalTypeAndOr != 0 {
 		newM.TagsEvaltype = int(m.ActionEvalTypeAndOr)
 	}
-	for _, host := range m.Hosts {
-		newM.HostNames = append(newM.HostNames, host.Hostname)
-	}
 	for _, tp := range m.Timeperiods {
 		t := jTimeperiod{}
 		switch tp.TimeperiodType {
@@ -282,6 +295,19 @@ func (m *Maintenance) Update() (response MaintenanceCreateResponse, err error) {
 		newM.Tags = append(newM.Tags, t)
 	}
 
+	switch m.Session.ApiVersion.Major {
+	case 4, 5:
+		for _, host := range m.Hosts {
+			newM.HostNames = append(newM.HostNames, host.Hostname)
+		}
+	case 6:
+		for _, host := range m.Hosts {
+			jHost := &jHost{}
+			jHost.Hostname = host.Hostname
+			newM.Hosts = append(newM.Hosts, *jHost)
+		}
+	}
+
 	if err = newM.FillHostIDs(m.Session); err != nil {
 		return
 	}
@@ -292,18 +318,45 @@ func (m *Maintenance) Update() (response MaintenanceCreateResponse, err error) {
 }
 
 func (m *jMaintenanceCreateParams) FillHostIDs(session *Session) error {
-	hosts, err := session.GetHosts(HostGetParams{})
+	hgp := &HostGetParams{}
+	// switch session.ApiVersion.Major {
+	// case 4, 5:
+	// 	for _, hostname := range m.HostNames {
+	// 		hgp.GetParameters.Filter["host"] = string(hostname)
+	// 	}
+	// case 6:
+	// 	for _, host := range m.Hosts {
+	// 		hgp.GetParameters.Filter["host"] = string(host.Hostname)
+	// 	}
+	// }
+
+	hosts, err := session.GetHosts(*hgp)
 	if err != nil {
 		return err
 	}
 
 	err = ErrMaintenanceHostNotFound
-	for _, name := range m.HostNames {
-		for _, host := range hosts {
-			if strings.ToUpper(strings.Trim(host.Hostname, " ")) == strings.ToUpper(strings.Trim(name, " ")) {
-				m.HostIDs = append(m.HostIDs, host.HostID)
+	switch session.ApiVersion.Major {
+	case 4, 5:
+		for _, name := range m.HostNames {
+			for _, host := range hosts {
+				// if strings.ToUpper(strings.Trim(host.Hostname, " ")) == strings.ToUpper(strings.Trim(name, " ")) {
+				if strings.EqualFold(strings.Trim(host.Hostname, " "), strings.Trim(name, " ")) {
+					m.HostIDs = append(m.HostIDs, host.HostID)
 
-				err = nil
+					err = nil
+				}
+			}
+		}
+	case 6:
+		for i, mHost := range m.Hosts {
+			for _, host := range hosts {
+				if strings.EqualFold(strings.Trim(host.Hostname, " "), strings.Trim(mHost.Hostname, " ")) {
+					m.Hosts[i].HostID = host.HostID
+					m.Hosts[i].Hostname = "" // Очищаем т.к. API Zabbix ругается на заполненное поле
+
+					err = nil
+				}
 			}
 		}
 	}
