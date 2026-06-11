@@ -40,7 +40,7 @@ type HostInterface struct {
 	Error string `json:"error,omitempty"`
 
 	// (readonly) Time when host interface became unavailable.
-	ErrorsFrom *UnixTimestamp `json:"errors_from,string,omitempty"`
+	ErrorsFrom *UnixTimestamp `json:"errors_from,omitempty"`
 
 	// HostID - ID of the host the interface belongs to.
 	HostID string `json:"hostid,omitempty"`
