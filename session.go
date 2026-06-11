@@ -137,6 +137,14 @@ func (c *Session) SetToken(token string) {
 	c.Token = token
 }
 
+// useBearerAuth returns true if the session should use Bearer token
+// authentication via the Authorization HTTP header instead of the deprecated
+// "auth" field in the JSON-RPC request body.
+// Zabbix 7.0+ recommends Bearer header; older versions use the "auth" field.
+func (c *Session) useBearerAuth() bool {
+	return c.ApiVersion.Major >= 7
+}
+
 // Do sends a JSON-RPC request and returns an API Response, using connection
 // configuration defined in the parent Session.
 //
@@ -147,8 +155,13 @@ func (c *Session) SetToken(token string) {
 //
 // Generally Get or a wrapper function will be used instead of Do.
 func (c *Session) Do(ctx context.Context, req *Request) (resp *Response, err error) {
-	// configure request
-	req.AuthToken = c.Token
+	// For Zabbix 7.0+, use Bearer token in Authorization header instead of
+	// the deprecated "auth" field in the JSON-RPC body.
+	if c.useBearerAuth() {
+		req.AuthToken = "" // do not include auth in body
+	} else {
+		req.AuthToken = c.Token
+	}
 
 	// encode request as json
 	b, err := json.Marshal(req)
@@ -164,7 +177,12 @@ func (c *Session) Do(ctx context.Context, req *Request) (resp *Response, err err
 		return
 	}
 	r.ContentLength = int64(len(b))
-	r.Header.Add("Content-Type", "application/json-rpc")
+	r.Header.Add("Content-Type", "application/json")
+
+	// For Zabbix 7.0+, send token as Bearer Authorization header
+	if c.useBearerAuth() && c.Token != "" {
+		r.Header.Add("Authorization", "Bearer "+c.Token)
+	}
 
 	// send request
 	client := c.client

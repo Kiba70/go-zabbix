@@ -146,7 +146,7 @@ type jMaintenanceCreateParams struct {
 
 	Groupids []string `json:"groupids,omitempty"` // Только до версии 6.0
 	// Hosts name
-	HostNames   []string          `json:"-,omitempty"`       // Только до версии 6.0
+	HostNames   []string          `json:"-"`                 // Только до версии 6.0
 	HostIDs     []string          `json:"hostids,omitempty"` // Только до версии 6.0
 	Timeperiods []jTimeperiod     `json:"timeperiods,omitempty"`
 	Tags        []jMaintenanceTag `json:"tags,omitempty"`
@@ -217,7 +217,7 @@ func (m *Maintenance) Create(ctx context.Context) (response MaintenanceCreateRes
 		for _, host := range m.Hosts {
 			newM.HostNames = append(newM.HostNames, host.Hostname)
 		}
-	case 6:
+	case 6, 7:
 		for _, host := range m.Hosts {
 			jHost := &jHost{}
 			jHost.Hostname = host.Hostname
@@ -288,7 +288,7 @@ func (m *Maintenance) Update(ctx context.Context) (response MaintenanceCreateRes
 		for _, host := range m.Hosts {
 			newM.HostNames = append(newM.HostNames, host.Hostname)
 		}
-	case 6:
+	case 6, 7:
 		for _, host := range m.Hosts {
 			jHost := &jHost{}
 			jHost.Hostname = host.Hostname
@@ -325,7 +325,7 @@ func (m *jMaintenanceCreateParams) FillHostIDs(ctx context.Context, session *Ses
 				}
 			}
 		}
-	case 6:
+	case 6, 7:
 		for i, mHost := range m.Hosts {
 			for _, host := range hosts {
 				if strings.EqualFold(strings.Trim(host.Hostname, " "), strings.Trim(mHost.Hostname, " ")) {

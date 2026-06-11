@@ -2,51 +2,53 @@
 Package zabbix provides bindings to interoperate between programs written in Go
 language and the Zabbix monitoring API.
 
-A number of Zabbix API bindings already exist for Go with varying levels of
-maturity. This project aims to provide an alternative implementation which is
-stable, fast, and allows for loose typing (using types such as interface{} or
-map[string]interface{}) as well as strong types (such as zabbix.Host or
-zabbix.Event).
+This project aims to provide a stable, fast Go client for the Zabbix JSON-RPC API
+with support for both loose typing (using interface{} or map[string]interface{})
+and strong types (such as zabbix.Host or zabbix.Event).
 
-The package aims to have comprehensive coverage of Zabbix API methods from v1.8
-through to v3.0 without introducing limitations to the native API methods.
+The package supports Zabbix API versions from 4.0 through to 7.0 with automatic
+version detection and version-specific behavior:
+
+  - Zabbix 4.x, 5.x: auth token in JSON-RPC body
+  - Zabbix 6.x: object-based hosts/groups in maintenance, auth token in JSON-RPC body
+  - Zabbix 7.x: Bearer token in Authorization HTTP header (preferred over auth in body),
+    Content-Type: application/json, new proxy management fields
+
+# Basic usage
 
 	package main
 
 	import (
+		"context"
 		"fmt"
-		"sbrf-bitbucket.sigma.sbrf.ru/scm/ci01810729/go-zabbix.git"
+
+		zabbix "path/to/go-zabbix"
 	)
 
 	func main() {
-		// Default approach - without session caching
-		session, err := zabbix.NewSession("http://zabbix/api_jsonrpc.php", "Admin", "zabbix")
+		ctx := context.Background()
+
+		// Basic session creation
+		session, err := zabbix.NewSession(ctx, "http://zabbix/api_jsonrpc.php", "Admin", "zabbix", "")
 		if err != nil {
 			panic(err)
 		}
-		fmt.Printf("Connected to Zabbix API v%s", session.GetVersion())
+		fmt.Printf("Connected to Zabbix API v%s\n", session.GetVersion(ctx))
 
-		// Use session builder with caching.
-		// You can use own cache by implementing SessionAbstractCache interface
-		// Optionally an http.Client can be passed to the builder, allowing to skip TLS verification,
-		// pass proxy settings, etc.
-
-		client := &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					InsecureSkipVerify: true
-				}
-			}
+		// Or use API token (recommended for Zabbix 6.4+ and 7.0+)
+		session, err = zabbix.NewSessionToken(ctx, "http://zabbix/api_jsonrpc.php", "your-api-token")
+		if err != nil {
+			panic(err)
 		}
+
+		// Or use session builder with caching
 		cache := zabbix.NewSessionFileCache().SetFilePath("./zabbix_session")
-		session, err := zabbix.CreateClient("http://zabbix/api_jsonrpc.php").
+		session, err = zabbix.CreateClient("http://zabbix/api_jsonrpc.php").
 			WithCache(cache).
-			WithHTTPClient(client).
 			WithCredentials("Admin", "zabbix").
-			Connect()
+			Connect(ctx)
 
-
-		fmt.Printf("Connected to Zabbix API v%s", session.GetVersion())
+		fmt.Printf("Connected to Zabbix API v%s\n", session.GetVersion(ctx))
 	}
 
 For more information see: https://github.com/cavaliercoder/go-zabbix

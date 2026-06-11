@@ -41,6 +41,15 @@ const (
 
 	// HostStatusUnmonitored Host is not monitored
 	HostStatusUnmonitored = 1
+
+	// HostMonitoredByServer indicates that the host is monitored by Zabbix server.
+	HostMonitoredByServer = 0
+
+	// HostMonitoredByProxy indicates that the host is monitored by a Zabbix proxy.
+	HostMonitoredByProxy = 1
+
+	// HostMonitoredByProxyGroup indicates that the host is monitored by a Zabbix proxy group.
+	HostMonitoredByProxyGroup = 2
 )
 
 // Host represents a Zabbix Host returned from the Zabbix API.
@@ -79,7 +88,24 @@ type Host struct {
 
 	TemplatesClear []Template `json:"templates_clear,omitempty"`
 
-	Proxy             string    `json:"proxy_hostid,omitempty"`
+	// Proxy is the ID of the proxy monitoring the host.
+	// Deprecated in Zabbix 7.0: use ProxyID instead.
+	Proxy string `json:"proxy_hostid,omitempty"`
+
+	// ProxyID is the ID of the proxy monitoring the host (Zabbix 7.0+).
+	// Replaces the deprecated proxy_hostid field.
+	ProxyID string `json:"proxyid,omitempty"`
+
+	// MonitoredBy indicates how the host is monitored (Zabbix 7.0+).
+	// Must be one of HostMonitoredByServer, HostMonitoredByProxy, HostMonitoredByProxyGroup.
+	MonitoredBy int `json:"monitored_by,string,omitempty"`
+
+	// ProxyGroupID is the ID of the proxy group monitoring the host (Zabbix 7.0+).
+	ProxyGroupID string `json:"proxy_groupid,omitempty"`
+
+	// AssignedProxyID is the read-only ID of the assigned proxy (Zabbix 7.0+).
+	AssignedProxyID string `json:"assigned_proxyid,omitempty"`
+
 	MaintenanceStatus string    `json:"maintenance_status,omitempty"`
 	MaintenanceID     string    `json:"maintenanceid,omitempty"`
 	MaintenanceType   string    `json:"maintenance_type,omitempty"`
