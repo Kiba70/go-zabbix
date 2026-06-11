@@ -1,6 +1,7 @@
 package zabbix
 
 import (
+	"context"
 	"fmt"
 )
 
@@ -114,9 +115,9 @@ type ItemGetParams struct {
 //
 // ErrEventNotFound is returned if the search result set is empty.
 // An error is returned if a transport, parsing or API error occurs.
-func (c *Session) GetItems(params ItemGetParams) ([]Item, error) {
+func (c *Session) GetItems(ctx context.Context, params ItemGetParams) ([]Item, error) {
 	items := make([]jItem, 0)
-	err := c.Get("item.get", params, &items)
+	err := c.Get(ctx, "item.get", params, &items)
 	if err != nil {
 		return nil, err
 	}

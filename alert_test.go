@@ -1,6 +1,7 @@
 package zabbix
 
 import (
+	"context"
 	"testing"
 )
 
@@ -11,7 +12,7 @@ func TestAlerts(t *testing.T) {
 		SelectHosts: SelectExtendedOutput,
 	}
 
-	alerts, err := session.GetAlerts(params)
+	alerts, err := session.GetAlerts(context.Background(), params)
 	if err != nil {
 		t.Fatalf("Error getting alerts: %v", err)
 	}

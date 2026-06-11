@@ -2,10 +2,11 @@ package zabbix
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -45,10 +46,10 @@ type APIVersion struct {
 //
 // The authentication token returned by the Zabbix API server is cached to
 // authenticate all subsequent requests in this Session.
-func NewSession(url, username, password, token string) (session *Session, err error) {
+func NewSession(ctx context.Context, url, username, password, token string) (session *Session, err error) {
 	// create session
 	session = &Session{URL: url}
-	err = session.login(username, password, token)
+	err = session.login(ctx, username, password, token)
 	return
 }
 
@@ -59,12 +60,12 @@ func NewSession(url, username, password, token string) (session *Session, err er
 //
 // The authentication token returned by the Zabbix API server is cached to
 // authenticate all subsequent requests in this Session.
-func NewSessionToken(url string, token string) (session *Session, err error) {
+func NewSessionToken(ctx context.Context, url string, token string) (session *Session, err error) {
 	// create session
 	session = &Session{URL: url, Token: token}
 
 	// get Zabbix API version
-	_, err = session.GetVersion()
+	_, err = session.GetVersion(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to retrieve Zabbix API version: %v", err)
 	}
@@ -72,9 +73,9 @@ func NewSessionToken(url string, token string) (session *Session, err error) {
 	return
 }
 
-func (c *Session) login(username, password, token string) error {
+func (c *Session) login(ctx context.Context, username, password, token string) error {
 	// get Zabbix API version
-	_, err := c.GetVersion()
+	_, err := c.GetVersion(ctx)
 	if err != nil {
 		return fmt.Errorf("Failed to retrieve Zabbix API version: %v", err)
 	}
@@ -90,7 +91,7 @@ func (c *Session) login(username, password, token string) error {
 		"password": password,
 	}
 
-	res, err := c.Do(NewRequest("user.login", params))
+	res, err := c.Do(ctx, NewRequest("user.login", params))
 	if err != nil {
 		return fmt.Errorf("Error logging in to Zabbix API: %v", err)
 	}
@@ -104,10 +105,10 @@ func (c *Session) login(username, password, token string) error {
 }
 
 // GetVersion returns the software version string of the connected Zabbix API.
-func (c *Session) GetVersion() (string, error) {
+func (c *Session) GetVersion(ctx context.Context) (string, error) {
 	if c.APIVersion == "" {
 		// get Zabbix API version
-		res, err := c.Do(NewRequest("apiinfo.version", nil))
+		res, err := c.Do(ctx, NewRequest("apiinfo.version", nil))
 		if err != nil {
 			return "", err
 		}
@@ -145,7 +146,7 @@ func (c *Session) SetToken(token string) {
 // When err is nil, resp always contains a non-nil resp.Body.
 //
 // Generally Get or a wrapper function will be used instead of Do.
-func (c *Session) Do(req *Request) (resp *Response, err error) {
+func (c *Session) Do(ctx context.Context, req *Request) (resp *Response, err error) {
 	// configure request
 	req.AuthToken = c.Token
 
@@ -158,7 +159,7 @@ func (c *Session) Do(req *Request) (resp *Response, err error) {
 	dprintf("Call     [%s:%d]: %s\n", req.Method, req.RequestID, b)
 
 	// create HTTP request
-	r, err := http.NewRequest("POST", c.URL, bytes.NewReader(b))
+	r, err := http.NewRequestWithContext(ctx, "POST", c.URL, bytes.NewReader(b))
 	if err != nil {
 		return
 	}
@@ -178,7 +179,7 @@ func (c *Session) Do(req *Request) (resp *Response, err error) {
 	defer res.Body.Close()
 
 	// read response body
-	b, err = ioutil.ReadAll(res.Body)
+	b, err = io.ReadAll(res.Body)
 	if err != nil {
 		return nil, fmt.Errorf("Error reading response: %v", err)
 	}
@@ -208,9 +209,9 @@ func (c *Session) Do(req *Request) (resp *Response, err error) {
 // unmarshals the JSON response body into the given interface.
 //
 // An error is return if a transport, marshalling or API error happened.
-func (c *Session) Get(method string, params interface{}, v interface{}) error {
+func (c *Session) Get(ctx context.Context, method string, params interface{}, v interface{}) error {
 	req := NewRequest(method, params)
-	resp, err := c.Do(req)
+	resp, err := c.Do(ctx, req)
 	if err != nil {
 		return err
 	}

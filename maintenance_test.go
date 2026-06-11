@@ -1,6 +1,7 @@
 package zabbix
 
 import (
+	"context"
 	"testing"
 )
 
@@ -14,7 +15,7 @@ func TestMaintenance(t *testing.T) {
 		SelectTags:        SelectExtendedOutput,
 	}
 
-	maintenances, err := session.GetMaintenance(params)
+	maintenances, err := session.GetMaintenance(context.Background(), params)
 	if err != nil {
 		t.Fatalf("Error getting maintenances: %v", err)
 	}

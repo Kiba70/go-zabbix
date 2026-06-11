@@ -1,6 +1,7 @@
 package zabbix
 
 import (
+	"context"
 	"testing"
 )
 
@@ -9,7 +10,7 @@ func TestUserMacros(t *testing.T) {
 
 	params := UserMacroGetParams{}
 
-	macros, err := session.GetUserMacro(params)
+	macros, err := session.GetUserMacro(context.Background(), params)
 
 	if err != nil {
 		t.Fatalf("Error getting user macros: %v", err)

@@ -1,6 +1,7 @@
 package zabbix
 
 import (
+	"context"
 	"testing"
 )
 
@@ -9,7 +10,7 @@ func TestActions(t *testing.T) {
 
 	params := ActionGetParams{}
 
-	actions, err := session.GetActions(params)
+	actions, err := session.GetActions(context.Background(), params)
 	if err != nil {
 		t.Fatalf("Error getting actions: %v", err)
 	}

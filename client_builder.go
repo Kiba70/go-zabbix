@@ -1,6 +1,7 @@
 package zabbix
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 )
@@ -47,7 +48,7 @@ func (builder *ClientBuilder) WithHTTPClient(client *http.Client) *ClientBuilder
 
 // Connect creates Zabbix API client and connects to the API server
 // or provides a cached server if any cache was specified
-func (builder *ClientBuilder) Connect() (session *Session, err error) {
+func (builder *ClientBuilder) Connect(ctx context.Context) (session *Session, err error) {
 	// Check if any cache was defined and if it has a valid cached session
 	if builder.hasCache && builder.cache.HasSession() {
 		if session, err = builder.cache.GetSession(); err == nil {
@@ -60,7 +61,7 @@ func (builder *ClientBuilder) Connect() (session *Session, err error) {
 	if builder.token == "" {
 		session = &Session{URL: builder.url, client: builder.client}
 
-		err = session.login(builder.credentials["username"], builder.credentials["password"], "")
+		err = session.login(ctx, builder.credentials["username"], builder.credentials["password"], "")
 		if err != nil {
 			return nil, err
 		}
@@ -68,7 +69,7 @@ func (builder *ClientBuilder) Connect() (session *Session, err error) {
 		session = &Session{URL: builder.url, client: builder.client, Token: builder.token}
 
 		// get Zabbix API version
-		_, err = session.GetVersion()
+		_, err = session.GetVersion(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to retrieve Zabbix API version: %v", err)
 		}

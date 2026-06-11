@@ -1,6 +1,7 @@
 package zabbix
 
 import (
+	"context"
 	"testing"
 )
 
@@ -9,7 +10,7 @@ func TestHostgroups(t *testing.T) {
 
 	params := HostgroupGetParams{}
 
-	hostgroups, err := session.GetHostgroups(params)
+	hostgroups, err := session.GetHostgroups(context.Background(), params)
 	if err != nil {
 		t.Fatalf("Error getting Hostgroups: %v", err)
 	}

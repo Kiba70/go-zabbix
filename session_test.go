@@ -1,6 +1,7 @@
 package zabbix
 
 import (
+	"context"
 	"os"
 	"testing"
 )
@@ -31,7 +32,7 @@ func GetTestSession(t *testing.T) *Session {
 	if session == nil {
 		username, password, url := GetTestCredentials()
 
-		session, err = NewSession(url, username, password)
+		session, err = NewSession(context.Background(), url, username, password, "")
 		if err != nil {
 			t.Fatalf("Error creating a session: %v", err)
 		}
@@ -43,7 +44,7 @@ func GetTestSession(t *testing.T) *Session {
 func TestSession(t *testing.T) {
 	s := GetTestSession(t)
 
-	v, err := s.GetVersion()
+	v, err := s.GetVersion(context.Background())
 	if err != nil || v == "" {
 		t.Errorf("No API version found for session")
 	}

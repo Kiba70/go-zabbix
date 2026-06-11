@@ -1,6 +1,7 @@
 package zabbix
 
 import (
+	"context"
 	"fmt"
 )
 
@@ -62,9 +63,9 @@ type HistoryGetParams struct {
 //
 // ErrEventNotFound is returned if the search result set is empty.
 // An error is returned if a transport, parsing or API error occurs.
-func (c *Session) GetHistories(params HistoryGetParams) ([]History, error) {
+func (c *Session) GetHistories(ctx context.Context, params HistoryGetParams) ([]History, error) {
 	histories := make([]jHistory, 0)
-	err := c.Get("history.get", params, &histories)
+	err := c.Get(ctx, "history.get", params, &histories)
 	if err != nil {
 		return nil, err
 	}

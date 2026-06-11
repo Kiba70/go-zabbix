@@ -68,8 +68,8 @@ func (c *jMaintenanceGet) Maintenance() (result *Maintenance, err error) {
 	}()
 
 	maintenance := &Maintenance{
-		ActionEvalTypeAndOr: TagsEvaltype(c.MaintenanceType),
-		Type:                MaintenanceType(c.TagsEvaltype),
+		Type:                MaintenanceType(c.MaintenanceType),
+		ActionEvalTypeAndOr: TagsEvaltype(c.TagsEvaltype),
 		ActiveSince:         time.Unix(c.ActiveSince, 0),
 		ActiveTill:          time.Unix(c.ActiveTill, 0),
 		Description:         c.Description,

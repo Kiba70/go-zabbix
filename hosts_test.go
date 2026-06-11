@@ -1,6 +1,7 @@
 package zabbix
 
 import (
+	"context"
 	"testing"
 )
 
@@ -25,7 +26,7 @@ func TestHosts(t *testing.T) {
 		SelectTriggers:        SelectExtendedOutput,
 	}
 
-	hosts, err := session.GetHosts(params)
+	hosts, err := session.GetHosts(context.Background(), params)
 	if err != nil {
 		t.Fatalf("Error getting Hosts: %v", err)
 	}

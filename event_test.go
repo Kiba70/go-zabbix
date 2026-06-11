@@ -1,6 +1,7 @@
 package zabbix
 
 import (
+	"context"
 	"testing"
 )
 
@@ -14,7 +15,7 @@ func TestEvents(t *testing.T) {
 		SelectRelatedObject:    SelectExtendedOutput,
 	}
 
-	events, err := session.GetEvents(params)
+	events, err := session.GetEvents(context.Background(), params)
 	if err != nil {
 		t.Fatalf("Error getting events: %v", err)
 	}

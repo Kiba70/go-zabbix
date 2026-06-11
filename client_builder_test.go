@@ -1,8 +1,9 @@
 package zabbix
 
 import (
+	"context"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"testing"
 )
 
@@ -13,7 +14,7 @@ const (
 )
 
 func prepareTemporaryDir(t *testing.T) (dir string, success bool) {
-	tempDir, err := ioutil.TempDir("", "zabbix-session-test")
+	tempDir, err := os.MkdirTemp("", "zabbix-session-test")
 
 	if err != nil {
 		t.Fatalf("cannot create a temporary dir for session cache: %v", err)
@@ -102,7 +103,7 @@ func testClientBuilder(t *testing.T, cache SessionAbstractCache) {
 	}
 
 	// Try to build a session using the session builder
-	client, err := CreateClient(url).WithCache(cache).WithCredentials(username, password).Connect()
+	client, err := CreateClient(url).WithCache(cache).WithCredentials(username, password).Connect(context.Background())
 
 	if err != nil {
 		t.Errorf("failed to create a session using cache - %s", err)

@@ -1,6 +1,7 @@
 package zabbix
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -134,9 +135,9 @@ type MaintenanceCreateParams struct {
 
 	Groupids []string `json:"groupids,omitempty"`
 	// Hosts name
-	HostNames   []string         `json:"-"`
-	HostIDs     []string         `json:"hostids"`
-	Timeperiods []Timeperiod     `json:"timeperiods"`
+	HostNames   []string     `json:"-"`
+	HostIDs     []string     `json:"hostids"`
+	Timeperiods []Timeperiod `json:"timeperiods"`
 	Tags        []MaintenanceTag `json:"tags,omitempty"`
 }
 
@@ -161,9 +162,9 @@ type MaintenanceCreateResponse struct {
 
 // GetMaintenance queries the Zabbix API for Maintenance matching the given search
 // parameters.
-func (s *Session) GetMaintenance(params *MaintenanceGetParams) ([]Maintenance, error) {
+func (s *Session) GetMaintenance(ctx context.Context, params *MaintenanceGetParams) ([]Maintenance, error) {
 	jmaintenance := make([]jMaintenanceGet, 0)
-	err := s.Get("maintenance.get", params, &jmaintenance)
+	err := s.Get(ctx, "maintenance.get", params, &jmaintenance)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +187,7 @@ func (s *Session) GetMaintenance(params *MaintenanceGetParams) ([]Maintenance, e
 	return out, nil
 }
 
-func (m *Maintenance) Create() (response MaintenanceCreateResponse, err error) {
+func (m *Maintenance) Create(ctx context.Context) (response MaintenanceCreateResponse, err error) {
 	newM := &jMaintenanceCreateParams{}
 	newM.Name = m.Name
 	newM.ActiveSince = m.ActiveSince.Unix()
@@ -199,11 +200,6 @@ func (m *Maintenance) Create() (response MaintenanceCreateResponse, err error) {
 		t := jTimeperiod{}
 		switch tp.TimeperiodType {
 		case 0:
-			// t.TimeperiodId = 0
-			// t.Day = 0
-			// t.Dayofweek = 0
-			// t.Every = 1 // Нельзя указывать 0
-			// t.Month = 0
 			t.Period = int(tp.Period.Seconds())
 			t.StartDate = tp.StartDate.Unix()
 			t.StartTime = tp.StartTime
@@ -211,7 +207,6 @@ func (m *Maintenance) Create() (response MaintenanceCreateResponse, err error) {
 		}
 		newM.Timeperiods = append(newM.Timeperiods, t)
 	}
-	// newM.Tags = append(newM.Tags, jMaintenanceTag(params.Tags)...)
 	for _, i := range m.Tags {
 		t := jMaintenanceTag(i)
 		newM.Tags = append(newM.Tags, t)
@@ -231,39 +226,33 @@ func (m *Maintenance) Create() (response MaintenanceCreateResponse, err error) {
 	}
 
 	// Заполняем HostID на основе заполненных выше имён хостов
-	if err = newM.FillHostIDs(m.Session); err != nil {
+	if err = newM.FillHostIDs(ctx, m.Session); err != nil {
 		return
 	}
 
-	err = m.Session.Get("maintenance.create", newM, &response)
+	err = m.Session.Get(ctx, "maintenance.create", newM, &response)
 
 	return
 }
 
-func (m *Maintenance) Delete() error {
+func (m *Maintenance) Delete(ctx context.Context) error {
 	ID := []string{m.MaintenanceID}
 	response := make(map[string]interface{})
-	if err := m.Session.Get("maintenance.delete", ID, &response); err != nil {
+	if err := m.Session.Get(ctx, "maintenance.delete", ID, &response); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (m *Maintenance) Update() (response MaintenanceCreateResponse, err error) {
+func (m *Maintenance) Update(ctx context.Context) (response MaintenanceCreateResponse, err error) {
 	newM := &jMaintenanceCreateParams{}
 	if m.MaintenanceID == "" {
-		// Нет ID
-		// err = error.Printf("Error")
 		return
 	}
 	newM.MaintenanceID = m.MaintenanceID
 	if m.Name != "" {
 		newM.Name = m.Name
 	}
-	// if m.ActiveSince !=  {
-	// 	newM.ActiveSince = m.ActiveSince.Unix()
-	// }
-	// newM.ActiveTill = m.ActiveTill.Unix()
 	if m.Description != "" {
 		newM.Description = m.Description
 	}
@@ -289,7 +278,6 @@ func (m *Maintenance) Update() (response MaintenanceCreateResponse, err error) {
 		}
 		newM.Timeperiods = append(newM.Timeperiods, t)
 	}
-	// newM.Tags = append(newM.Tags, jMaintenanceTag(params.Tags)...)
 	for _, i := range m.Tags {
 		t := jMaintenanceTag(i)
 		newM.Tags = append(newM.Tags, t)
@@ -308,29 +296,19 @@ func (m *Maintenance) Update() (response MaintenanceCreateResponse, err error) {
 		}
 	}
 
-	if err = newM.FillHostIDs(m.Session); err != nil {
+	if err = newM.FillHostIDs(ctx, m.Session); err != nil {
 		return
 	}
 
-	err = m.Session.Get("maintenance.update", newM, &response)
+	err = m.Session.Get(ctx, "maintenance.update", newM, &response)
 
 	return
 }
 
-func (m *jMaintenanceCreateParams) FillHostIDs(session *Session) error {
+func (m *jMaintenanceCreateParams) FillHostIDs(ctx context.Context, session *Session) error {
 	hgp := &HostGetParams{}
-	// switch session.ApiVersion.Major {
-	// case 4, 5:
-	// 	for _, hostname := range m.HostNames {
-	// 		hgp.GetParameters.Filter["host"] = string(hostname)
-	// 	}
-	// case 6:
-	// 	for _, host := range m.Hosts {
-	// 		hgp.GetParameters.Filter["host"] = string(host.Hostname)
-	// 	}
-	// }
 
-	hosts, err := session.GetHosts(*hgp)
+	hosts, err := session.GetHosts(ctx, *hgp)
 	if err != nil {
 		return err
 	}
@@ -340,7 +318,6 @@ func (m *jMaintenanceCreateParams) FillHostIDs(session *Session) error {
 	case 4, 5:
 		for _, name := range m.HostNames {
 			for _, host := range hosts {
-				// if strings.ToUpper(strings.Trim(host.Hostname, " ")) == strings.ToUpper(strings.Trim(name, " ")) {
 				if strings.EqualFold(strings.Trim(host.Hostname, " "), strings.Trim(name, " ")) {
 					m.HostIDs = append(m.HostIDs, host.HostID)
 

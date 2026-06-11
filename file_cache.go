@@ -3,7 +3,6 @@ package zabbix
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"time"
 )
@@ -63,12 +62,12 @@ func (c *SessionFileCache) SaveSession(session *Session) error {
 		return err
 	}
 
-	return ioutil.WriteFile(c.filePath, []byte(serialized), os.FileMode(c.filePermissions))
+	return os.WriteFile(c.filePath, []byte(serialized), os.FileMode(c.filePermissions))
 }
 
 // GetSession returns cached Zabbix session
 func (c *SessionFileCache) GetSession() (*Session, error) {
-	contents, err := ioutil.ReadFile(c.filePath)
+	contents, err := os.ReadFile(c.filePath)
 
 	if err != nil {
 		return nil, err

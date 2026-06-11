@@ -1,5 +1,7 @@
 package zabbix
 
+import "context"
+
 const (
 	// HostInterfaceAvailabilityUnknown Unknown availability of host, never has come online
 	HostInterfaceAvailabilityUnknown = 0
@@ -122,9 +124,9 @@ type HostInterfaceGetParams struct {
 //
 // ErrEventNotFound is returned if the search result set is empty.
 // An error is returned if a transport, parsing or API error occurs.
-func (c *Session) GetHostInterfaces(params HostInterfaceGetParams) ([]HostInterface, error) {
+func (c *Session) GetHostInterfaces(ctx context.Context, params HostInterfaceGetParams) ([]HostInterface, error) {
 	hostInterfaces := make([]HostInterface, 0)
-	err := c.Get("hostinterface.get", params, &hostInterfaces)
+	err := c.Get(ctx, "hostinterface.get", params, &hostInterfaces)
 	if err != nil {
 		return nil, err
 	}

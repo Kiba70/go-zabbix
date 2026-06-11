@@ -1,5 +1,7 @@
 package zabbix
 
+import "context"
+
 const (
 	// HostSourceDefault indicates that a Host was created in the normal way.
 	HostSourceDefault = 0
@@ -207,9 +209,9 @@ type HostResponse struct {
 //
 // ErrEventNotFound is returned if the search result set is empty.
 // An error is returned if a transport, parsing or API error occurs.
-func (s *Session) GetHosts(params HostGetParams) ([]Host, error) {
+func (s *Session) GetHosts(ctx context.Context, params HostGetParams) ([]Host, error) {
 	hosts := make([]Host, 0)
-	err := s.Get("host.get", params, &hosts)
+	err := s.Get(ctx, "host.get", params, &hosts)
 	if err != nil {
 		return nil, err
 	}
@@ -221,14 +223,13 @@ func (s *Session) GetHosts(params HostGetParams) ([]Host, error) {
 	return hosts, nil
 }
 
-func (s *Session) HostCreate(hosts ...Host) (response []string, err error) {
+func (s *Session) HostCreate(ctx context.Context, hosts ...Host) (response []string, err error) {
 	var hcr HostResponse
-	// var err2 error
 
 	response = make([]string, 0, len(hosts))
 
 	for _, h := range hosts {
-		err2 := s.Get("host.create", h, &hcr)
+		err2 := s.Get(ctx, "host.create", h, &hcr)
 		if err2 != nil {
 			err = err2
 		}
@@ -238,36 +239,19 @@ func (s *Session) HostCreate(hosts ...Host) (response []string, err error) {
 	return
 }
 
-/* func (c *Session) HostUpdate(hosts ...Host) (response []string, err error) {
-	var hcr HostResponse
-	// var err2 error
-
-	response = make([]string, 0, len(hosts))
-
-	for _, h := range hosts {
-		err2 := c.Get("host.update", h, &hcr)
-		if err2 != nil {
-			err = err2
-		}
-		response = append(response, hcr.IDs...)
-	}
-
-	return
-} */
-
-func (s *Session) HostUpdate(hosts ...Host) (response []string, err error) {
+func (s *Session) HostUpdate(ctx context.Context, hosts ...Host) (response []string, err error) {
 	var hcr HostResponse
 
 	response = make([]string, 0, len(hosts))
 
-	err = s.Get("host.update", hosts, &hcr)
+	err = s.Get(ctx, "host.update", hosts, &hcr)
 
 	response = append(response, hcr.IDs...)
 
 	return
 }
 
-func (s *Session) HostDelete(hosts ...Host) (response []string, err error) {
+func (s *Session) HostDelete(ctx context.Context, hosts ...Host) (response []string, err error) {
 	var hcr HostResponse
 
 	response = make([]string, 0, len(hosts))
@@ -277,12 +261,12 @@ func (s *Session) HostDelete(hosts ...Host) (response []string, err error) {
 		toDelete = append(toDelete, h.HostID)
 	}
 
-	err = s.Get("host.delete", toDelete, &hcr)
+	err = s.Get(ctx, "host.delete", toDelete, &hcr)
 
 	response = append(response, hcr.IDs...)
 
 	if len(toDelete) == len(response) {
-		return // Всё удалено - выходим
+		return
 	}
 
 	// Получаем список HostID которые не удалось удалить
@@ -301,9 +285,9 @@ func (s *Session) HostDelete(hosts ...Host) (response []string, err error) {
 	}
 	mgp.Hostids = make([]string, 0, len(toDelete))
 	mgp.Hostids = append(mgp.Hostids, toDelete...)
-	maintenances, err := s.GetMaintenance(&mgp)
+	maintenances, err := s.GetMaintenance(ctx, &mgp)
 	if err != nil {
-		return // Ошибка или ничего не найдено - выходим
+		return
 	}
 
 	// Удаляем хосты из maintenance
@@ -319,16 +303,14 @@ func (s *Session) HostDelete(hosts ...Host) (response []string, err error) {
 			}
 		}
 		if allHosts {
-			m.Delete() // Удаляем весь maintenance
+			m.Delete(ctx)
 			tryDelete = append(tryDelete, hosts2...)
-		} else {
-			// В maintenance только часть хостов
 		}
 	}
 
 	// Вторая попытка удаления
 	if len(tryDelete) > 0 {
-		err = s.Get("host.delete", tryDelete, &hcr)
+		err = s.Get(ctx, "host.delete", tryDelete, &hcr)
 		response = append(response, hcr.IDs...)
 	}
 

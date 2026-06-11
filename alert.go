@@ -1,6 +1,7 @@
 package zabbix
 
 import (
+	"context"
 	"fmt"
 	"time"
 )
@@ -124,9 +125,9 @@ type AlertGetParams struct {
 //
 // ErrNotFound is returned if the search result set is empty.
 // An error is returned if a transport, parsing or API error occurs.
-func (c *Session) GetAlerts(params AlertGetParams) ([]Alert, error) {
+func (c *Session) GetAlerts(ctx context.Context, params AlertGetParams) ([]Alert, error) {
 	alerts := make([]jAlert, 0)
-	err := c.Get("alert.get", params, &alerts)
+	err := c.Get(ctx, "alert.get", params, &alerts)
 	if err != nil {
 		return nil, err
 	}

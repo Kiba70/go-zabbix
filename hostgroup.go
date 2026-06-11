@@ -1,6 +1,7 @@
 package zabbix
 
 import (
+	"context"
 	"fmt"
 )
 
@@ -112,9 +113,9 @@ type HostgroupGetParams struct {
 //
 // ErrEventNotFound is returned if the search result set is empty.
 // An error is returned if a transport, parsing or API error occurs.
-func (c *Session) GetHostgroups(params HostgroupGetParams) ([]Hostgroup, error) {
+func (c *Session) GetHostgroups(ctx context.Context, params HostgroupGetParams) ([]Hostgroup, error) {
 	hostgroups := make([]jHostgroup, 0)
-	err := c.Get("hostgroup.get", params, &hostgroups)
+	err := c.Get(ctx, "hostgroup.get", params, &hostgroups)
 	if err != nil {
 		return nil, err
 	}
