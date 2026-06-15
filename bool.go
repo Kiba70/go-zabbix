@@ -2,12 +2,15 @@ package zabbix
 
 import (
 	"fmt"
+	"strings"
 )
 
 type ZBXBoolean bool
 
 func (bit *ZBXBoolean) UnmarshalJSON(data []byte) error {
-	asString := string(data)
+	// Zabbix API encodes booleans as quoted strings: "1", "0", "true", "false".
+	// Also accept unquoted forms for robustness.
+	asString := strings.Trim(string(data), `"`)
 	switch asString {
 	case "1", "true":
 		*bit = true

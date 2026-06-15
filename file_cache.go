@@ -95,8 +95,8 @@ func (c *SessionFileCache) checkSessionLifeTime(sessionContainer *cachedSessionC
 	createdAt := sessionContainer.CreatedAt
 	timeDiff := now - createdAt
 
-	// Check session TTL by time diff
-	isExpired := timeDiff > int64(c.sessionLifeTime)
+	// Check session TTL by time diff (both in seconds).
+	isExpired := timeDiff > int64(c.sessionLifeTime.Seconds())
 
 	return !isExpired
 }
@@ -117,7 +117,7 @@ func (c *SessionFileCache) Flush() error {
 func NewSessionFileCache() *SessionFileCache {
 	return &SessionFileCache{
 		filePath:        "./zabbix_session",
-		sessionLifeTime: 14400, // Default TTL is 4 hours
+		sessionLifeTime: 14400 * time.Second, // Default TTL is 4 hours
 		filePermissions: 0600,
 	}
 }

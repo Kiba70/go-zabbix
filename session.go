@@ -119,9 +119,15 @@ func (c *Session) GetVersion(ctx context.Context) (string, error) {
 		}
 
 		versions := strings.Split(c.APIVersion, ".")
-		c.ApiVersion.Major, _ = strconv.Atoi(versions[0])
-		c.ApiVersion.Minor, _ = strconv.Atoi(versions[1])
-		c.ApiVersion.Build, _ = strconv.Atoi(versions[2])
+		if len(versions) >= 1 {
+			c.ApiVersion.Major, _ = strconv.Atoi(versions[0])
+		}
+		if len(versions) >= 2 {
+			c.ApiVersion.Minor, _ = strconv.Atoi(versions[1])
+		}
+		if len(versions) >= 3 {
+			c.ApiVersion.Build, _ = strconv.Atoi(versions[2])
+		}
 	}
 	return c.APIVersion, nil
 }
