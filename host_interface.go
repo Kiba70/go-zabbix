@@ -1,6 +1,10 @@
 package zabbix
 
-import "context"
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+)
 
 const (
 	// HostInterfaceAvailabilityUnknown Unknown availability of host, never has come online
@@ -101,6 +105,16 @@ type HostInterfaceDetail struct {
 
 	// SNMPv3 context name.
 	Contextname string `json:"contextname,omitempty"`
+}
+
+func (d *HostInterfaceDetail) UnmarshalJSON(data []byte) error {
+	if bytes.Equal(bytes.TrimSpace(data), []byte("[]")) {
+		*d = HostInterfaceDetail{}
+		return nil
+	}
+
+	type hostInterfaceDetailJSON HostInterfaceDetail
+	return json.Unmarshal(data, (*hostInterfaceDetailJSON)(d))
 }
 
 type HostInterfaceGetParams struct {

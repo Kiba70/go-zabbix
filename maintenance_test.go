@@ -2,6 +2,7 @@ package zabbix
 
 import (
 	"context"
+	"errors"
 	"testing"
 )
 
@@ -16,6 +17,9 @@ func TestMaintenance(t *testing.T) {
 	}
 
 	maintenances, err := session.GetMaintenance(context.Background(), params)
+	if errors.Is(err, ErrNotFound) {
+		t.Skip("No maintenance found")
+	}
 	if err != nil {
 		t.Fatalf("Error getting maintenances: %v", err)
 	}

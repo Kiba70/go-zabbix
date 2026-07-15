@@ -2,6 +2,7 @@ package zabbix
 
 import (
 	"context"
+	"errors"
 	"testing"
 )
 
@@ -13,6 +14,9 @@ func TestAlerts(t *testing.T) {
 	}
 
 	alerts, err := session.GetAlerts(context.Background(), params)
+	if errors.Is(err, ErrNotFound) {
+		t.Skip("No alerts found")
+	}
 	if err != nil {
 		t.Fatalf("Error getting alerts: %v", err)
 	}

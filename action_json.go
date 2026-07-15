@@ -36,7 +36,7 @@ func (c *jAction) Action() (*Action, error) {
 	action.RecoveryMessageEnabled = (c.RecoveryMsg == "1")
 	action.Enabled = (c.Status == "0")
 
-	action.StepDuration, err = strconv.Atoi(c.EscPeriod)
+	action.StepDuration, err = parseActionStepDuration(c.EscPeriod)
 	if err != nil {
 		return nil, fmt.Errorf("Error parsing Action Step Duration: %v", err)
 	}
@@ -54,4 +54,36 @@ func (c *jAction) Action() (*Action, error) {
 	}
 
 	return action, nil
+}
+
+func parseActionStepDuration(value string) (int, error) {
+	if value == "" {
+		return 0, strconv.ErrSyntax
+	}
+
+	multiplier := 1
+	number := value
+	switch value[len(value)-1] {
+	case 's':
+		number = value[:len(value)-1]
+	case 'm':
+		multiplier = 60
+		number = value[:len(value)-1]
+	case 'h':
+		multiplier = 60 * 60
+		number = value[:len(value)-1]
+	case 'd':
+		multiplier = 24 * 60 * 60
+		number = value[:len(value)-1]
+	case 'w':
+		multiplier = 7 * 24 * 60 * 60
+		number = value[:len(value)-1]
+	}
+
+	duration, err := strconv.Atoi(number)
+	if err != nil {
+		return 0, err
+	}
+
+	return duration * multiplier, nil
 }

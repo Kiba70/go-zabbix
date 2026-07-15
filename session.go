@@ -207,6 +207,9 @@ func (c *Session) Do(ctx context.Context, req *Request) (resp *Response, err err
 	if err != nil {
 		return nil, fmt.Errorf("Error reading response: %v", err)
 	}
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Unexpected HTTP status: %s", res.Status)
+	}
 
 	dprintf("Response [%s:%d]: %s\n", req.Method, req.RequestID, b)
 

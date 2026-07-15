@@ -1,6 +1,10 @@
 package zabbix
 
-import "context"
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+)
 
 const (
 	// HostSourceDefault indicates that a Host was created in the normal way.
@@ -131,6 +135,16 @@ type Host struct {
 type inventory struct {
 	DateHwInstall  string `json:"date_hw_install,omitempty"`
 	DateHwPurchase string `json:"date_hw_purchase,omitempty"`
+}
+
+func (i *inventory) UnmarshalJSON(data []byte) error {
+	if bytes.Equal(bytes.TrimSpace(data), []byte("[]")) {
+		*i = inventory{}
+		return nil
+	}
+
+	type inventoryJSON inventory
+	return json.Unmarshal(data, (*inventoryJSON)(i))
 }
 
 // HostGetParams represent the parameters for a `host.get` API call.

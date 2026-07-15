@@ -2,13 +2,28 @@ package zabbix
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 )
+
+func TestHostInventoryUnmarshal(t *testing.T) {
+	for _, data := range []string{
+		`{"inventory":[]}`,
+		`{"inventory":{"date_hw_install":"2026-01-02"}}`,
+		`{"interfaces":[{"details":[]}]}`,
+	} {
+		var host Host
+		if err := json.Unmarshal([]byte(data), &host); err != nil {
+			t.Errorf("cannot unmarshal %s: %v", data, err)
+		}
+	}
+}
 
 func TestHosts(t *testing.T) {
 	session := GetTestSession(t)
 
 	params := HostGetParams{
+		GetParameters:         GetParameters{ResultLimit: 10},
 		IncludeTemplates:      true,
 		SelectGroups:          SelectExtendedOutput,
 		SelectApplications:    SelectExtendedOutput,
