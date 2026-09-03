@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 )
 
 const (
@@ -325,9 +327,10 @@ func (s *Session) HostDelete(ctx context.Context, hosts ...Host) (response []str
 	}
 	mgp.Hostids = make([]string, 0, len(toDelete))
 	mgp.Hostids = append(mgp.Hostids, toDelete...)
-	maintenances, err := s.GetMaintenance(ctx, &mgp)
-	if err != nil {
-		return
+	maintenances, err2 := s.GetMaintenance(ctx, &mgp)
+	if err2 != nil && !errors.Is(err2, ErrNotFound) { // ErrNotFound - просто нет maintenance
+		// Сохраняем исходную ошибку удаления
+		return response, fmt.Errorf("%w; get maintenance: %v", err, err2)
 	}
 
 	// Удаляем хосты из maintenance
@@ -344,17 +347,33 @@ func (s *Session) HostDelete(ctx context.Context, hosts ...Host) (response []str
 		}
 		if allHosts {
 			m.Delete(ctx)
-			tryDelete = append(tryDelete, hosts2...)
+			// Исключаем дубликаты HostID: один хост может входить в несколько
+			// Maintenance, а Zabbix отвергает host.delete с повторяющимися
+			// значениями: Invalid parameter "/N": value (X) already exists
+			for _, hh := range hosts2 {
+				if !have(tryDelete, hh) {
+					tryDelete = append(tryDelete, hh)
+				}
+			}
 		}
 	}
 
 	// Вторая попытка удаления
 	if len(tryDelete) > 0 {
-		err = s.Get(ctx, "host.delete", tryDelete, &hcr)
+		if err2 = s.Get(ctx, "host.delete", tryDelete, &hcr); err2 != nil {
+			// Сохраняем исходную ошибку удаления
+			return response, fmt.Errorf("%w; retry: %v", err, err2)
+		}
 		response = append(response, hcr.IDs...)
 	}
 
-	return
+	if len(response) != len(hosts) {
+		// Часть хостов удалить не удалось - возвращаем исходную ошибку
+		return response, err
+	}
+
+	// Все хосты удалены, несмотря на ошибку первой попытки
+	return response, nil
 }
 
 func have(s []string, i string) bool {
