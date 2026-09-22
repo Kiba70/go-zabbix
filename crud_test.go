@@ -2,6 +2,7 @@ package zabbix
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -88,6 +89,9 @@ func TestHostDelete_Success(t *testing.T) {
 	m, session := newMockSession(t, "6.0.0")
 	defer m.Close()
 
+	m.handle("maintenance.get", func(req *Request) (interface{}, *APIError) {
+		return []interface{}{}, nil
+	})
 	m.handle("host.delete", func(req *Request) (interface{}, *APIError) {
 		return map[string]interface{}{
 			"hostids": []string{"10084"},
@@ -100,6 +104,186 @@ func TestHostDelete_Success(t *testing.T) {
 	}
 	if len(ids) != 1 {
 		t.Fatalf("expected 1 deleted ID, got %d", len(ids))
+	}
+}
+
+func TestHostDelete_CleansMaintenances(t *testing.T) {
+	m, session := newMockSession(t, "6.0.0")
+	defer m.Close()
+
+	updates := make(map[string][]string)
+	deletedMaintenance := ""
+	hostDeleted := false
+
+	m.handle("maintenance.get", func(req *Request) (interface{}, *APIError) {
+		var params struct {
+			HostIDs      []string `json:"hostids"`
+			SelectHosts  string   `json:"selectHosts"`
+			SelectGroups string   `json:"selectGroups"`
+		}
+		decodeRequestParams(t, req, &params)
+		if len(params.HostIDs) != 1 || params.HostIDs[0] != "1" {
+			t.Errorf("unexpected hostids: %v", params.HostIDs)
+		}
+		if params.SelectHosts != SelectExtendedOutput || params.SelectGroups != SelectExtendedOutput {
+			t.Errorf("maintenance targets were not requested: %+v", params)
+		}
+
+		return []map[string]interface{}{
+			{
+				"maintenanceid": "10",
+				"hosts": []map[string]interface{}{
+					{"hostid": "1"},
+					{"hostid": "2"},
+				},
+				"groups": []interface{}{},
+			},
+			{
+				"maintenanceid": "20",
+				"hosts":         []map[string]interface{}{{"hostid": "1"}},
+				"groups":        []interface{}{},
+			},
+			{
+				"maintenanceid": "30",
+				"hosts":         []map[string]interface{}{{"hostid": "1"}},
+				"groups":        []map[string]interface{}{{"groupid": "5"}},
+			},
+		}, nil
+	})
+	m.handle("maintenance.update", func(req *Request) (interface{}, *APIError) {
+		params, ok := req.Params.(map[string]interface{})
+		if !ok {
+			t.Fatalf("unexpected params type: %T", req.Params)
+		}
+		if _, ok := params["hosts"]; !ok {
+			t.Fatal("hosts must be sent even when the list is empty")
+		}
+
+		var update struct {
+			MaintenanceID string `json:"maintenanceid"`
+			Hosts         []struct {
+				HostID string `json:"hostid"`
+			} `json:"hosts"`
+		}
+		decodeRequestParams(t, req, &update)
+		for _, host := range update.Hosts {
+			updates[update.MaintenanceID] = append(updates[update.MaintenanceID], host.HostID)
+		}
+		if len(update.Hosts) == 0 {
+			updates[update.MaintenanceID] = []string{}
+		}
+
+		return map[string]interface{}{"maintenanceids": []string{update.MaintenanceID}}, nil
+	})
+	m.handle("maintenance.delete", func(req *Request) (interface{}, *APIError) {
+		var ids []string
+		decodeRequestParams(t, req, &ids)
+		if len(ids) != 1 {
+			t.Fatalf("unexpected maintenance IDs: %v", ids)
+		}
+		deletedMaintenance = ids[0]
+		return map[string]interface{}{"maintenanceids": ids}, nil
+	})
+	m.handle("host.delete", func(req *Request) (interface{}, *APIError) {
+		hostDeleted = true
+		return map[string]interface{}{"hostids": []string{"1"}}, nil
+	})
+
+	ids, err := session.HostDelete(context.Background(), Host{HostID: "1"})
+	if err != nil {
+		t.Fatalf("HostDelete failed: %v", err)
+	}
+	if len(ids) != 1 || ids[0] != "1" {
+		t.Fatalf("unexpected deleted host IDs: %v", ids)
+	}
+	if got := updates["10"]; len(got) != 1 || got[0] != "2" {
+		t.Errorf("unexpected remaining hosts for maintenance 10: %v", got)
+	}
+	if got, ok := updates["30"]; !ok || len(got) != 0 {
+		t.Errorf("maintenance 30 must remain with an empty host list: %v", got)
+	}
+	if deletedMaintenance != "20" {
+		t.Errorf("expected maintenance 20 to be deleted, got %q", deletedMaintenance)
+	}
+	if !hostDeleted {
+		t.Error("host.delete was not called")
+	}
+}
+
+func TestHostDelete_UpdatesMaintenanceForZabbix5(t *testing.T) {
+	m, session := newMockSession(t, "5.0.0")
+	defer m.Close()
+
+	m.handle("maintenance.get", func(req *Request) (interface{}, *APIError) {
+		return []map[string]interface{}{
+			{
+				"maintenanceid": "10",
+				"hosts": []map[string]interface{}{
+					{"hostid": "1"},
+					{"hostid": "2"},
+				},
+				"groups": []interface{}{},
+			},
+		}, nil
+	})
+	m.handle("maintenance.update", func(req *Request) (interface{}, *APIError) {
+		var update struct {
+			MaintenanceID string   `json:"maintenanceid"`
+			HostIDs       []string `json:"hostids"`
+		}
+		decodeRequestParams(t, req, &update)
+		if update.MaintenanceID != "10" || len(update.HostIDs) != 1 || update.HostIDs[0] != "2" {
+			t.Errorf("unexpected maintenance update: %+v", update)
+		}
+		return map[string]interface{}{"maintenanceids": []string{"10"}}, nil
+	})
+	m.handle("host.delete", func(req *Request) (interface{}, *APIError) {
+		return map[string]interface{}{"hostids": []string{"1"}}, nil
+	})
+
+	if _, err := session.HostDelete(context.Background(), Host{HostID: "1"}); err != nil {
+		t.Fatalf("HostDelete failed: %v", err)
+	}
+}
+
+func TestHostDelete_DoesNotDeleteHostWhenMaintenanceCleanupFails(t *testing.T) {
+	m, session := newMockSession(t, "6.0.0")
+	defer m.Close()
+
+	hostDeleteCalled := false
+	m.handle("maintenance.get", func(req *Request) (interface{}, *APIError) {
+		return []map[string]interface{}{
+			{
+				"maintenanceid": "10",
+				"hosts":         []map[string]interface{}{{"hostid": "1"}, {"hostid": "2"}},
+				"groups":        []interface{}{},
+			},
+		}, nil
+	})
+	m.handle("maintenance.update", func(req *Request) (interface{}, *APIError) {
+		return nil, &APIError{Code: -32602, Message: "Invalid params"}
+	})
+	m.handle("host.delete", func(req *Request) (interface{}, *APIError) {
+		hostDeleteCalled = true
+		return map[string]interface{}{"hostids": []string{"1"}}, nil
+	})
+
+	if _, err := session.HostDelete(context.Background(), Host{HostID: "1"}); err == nil {
+		t.Fatal("expected maintenance cleanup error")
+	}
+	if hostDeleteCalled {
+		t.Error("host.delete must not be called after a maintenance cleanup error")
+	}
+}
+
+func decodeRequestParams(t *testing.T, req *Request, target interface{}) {
+	t.Helper()
+	b, err := json.Marshal(req.Params)
+	if err != nil {
+		t.Fatalf("failed to encode request params: %v", err)
+	}
+	if err := json.Unmarshal(b, target); err != nil {
+		t.Fatalf("failed to decode request params: %v", err)
 	}
 }
 
@@ -226,17 +410,17 @@ func TestGetMaintenance_Success(t *testing.T) {
 	m.handle("maintenance.get", func(req *Request) (interface{}, *APIError) {
 		return []map[string]interface{}{
 			{
-				"maintenanceid":     "1",
-				"name":              "Weekly",
-				"active_since":      "1609459200",
-				"active_till":       "1609545600",
-				"description":       "Weekly downtime",
-				"maintenance_type":  "0",
-				"tags_evaltype":     "0",
-				"hosts":             []interface{}{},
-				"groups":            []interface{}{},
-				"tags":              []interface{}{},
-				"timeperiods":       []interface{}{},
+				"maintenanceid":    "1",
+				"name":             "Weekly",
+				"active_since":     "1609459200",
+				"active_till":      "1609545600",
+				"description":      "Weekly downtime",
+				"maintenance_type": "0",
+				"tags_evaltype":    "0",
+				"hosts":            []interface{}{},
+				"groups":           []interface{}{},
+				"tags":             []interface{}{},
+				"timeperiods":      []interface{}{},
 			},
 		}, nil
 	})

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 )
 
 const (
@@ -296,78 +297,53 @@ func (s *Session) HostDelete(ctx context.Context, hosts ...Host) (response []str
 
 	response = make([]string, 0, len(hosts))
 	toDelete := make([]string, 0, len(hosts))
+	toDeleteSet := make(map[string]struct{}, len(hosts))
 
 	for _, h := range hosts {
 		toDelete = append(toDelete, h.HostID)
+		toDeleteSet[h.HostID] = struct{}{}
+	}
+
+	// Получаем обслуживания, в которых явно указаны удаляемые хосты.
+	mgp := MaintenanceGetParams{
+		SelectHosts:  SelectExtendedOutput,
+		SelectGroups: SelectExtendedOutput,
+		Hostids:      toDelete,
+	}
+	maintenances, err := s.GetMaintenance(ctx, &mgp)
+	if err != nil && !errors.Is(err, ErrNotFound) {
+		return
+	}
+
+	// Сначала убираем хосты из обслуживаний, чтобы host.delete не оставил ссылок на них.
+	for _, m := range maintenances {
+		remainingHosts := make([]Host, 0, len(m.Hosts))
+		hostRemoved := false
+		for _, h := range m.Hosts {
+			if _, ok := toDeleteSet[h.HostID]; ok {
+				hostRemoved = true
+				continue
+			}
+			remainingHosts = append(remainingHosts, h)
+		}
+
+		// maintenance.get может вернуть обслуживание из-за членства хоста в группе.
+		if !hostRemoved {
+			continue
+		}
+
+		if len(remainingHosts) == 0 && len(m.Hostgroups) == 0 {
+			err = m.Delete(ctx)
+		} else {
+			err = s.updateMaintenanceHosts(ctx, m.MaintenanceID, remainingHosts)
+		}
+		if err != nil {
+			return response, err
+		}
 	}
 
 	err = s.Get(ctx, "host.delete", toDelete, &hcr)
-
 	response = append(response, hcr.IDs...)
 
-	if len(toDelete) == len(response) {
-		return
-	}
-
-	// Получаем список HostID которые не удалось удалить
-	for _, r := range response {
-		for i, d := range toDelete {
-			if r == d {
-				toDelete = removeSliceIndex(toDelete, i)
-				break
-			}
-		}
-	}
-
-	// Получаем список Maintenance в которых участвуют не удалённые хосты
-	mgp := MaintenanceGetParams{
-		SelectHosts: SelectExtendedOutput,
-	}
-	mgp.Hostids = make([]string, 0, len(toDelete))
-	mgp.Hostids = append(mgp.Hostids, toDelete...)
-	maintenances, err := s.GetMaintenance(ctx, &mgp)
-	if err != nil {
-		return
-	}
-
-	// Удаляем хосты из maintenance
-	tryDelete := make([]string, 0, len(toDelete))
-	for _, m := range maintenances {
-		allHosts := true
-		hosts2 := make([]string, 0)
-		for _, h := range m.Hosts {
-			if !have(toDelete, h.HostID) {
-				allHosts = false
-			} else {
-				hosts2 = append(hosts2, h.HostID)
-			}
-		}
-		if allHosts {
-			m.Delete(ctx)
-			tryDelete = append(tryDelete, hosts2...)
-		}
-	}
-
-	// Вторая попытка удаления
-	if len(tryDelete) > 0 {
-		err = s.Get(ctx, "host.delete", tryDelete, &hcr)
-		response = append(response, hcr.IDs...)
-	}
-
 	return
-}
-
-func have(s []string, i string) bool {
-	for _, ss := range s {
-		if ss == i {
-			return true
-		}
-	}
-
-	return false
-}
-
-func removeSliceIndex(s []string, i int) []string {
-	s[i] = s[len(s)-1]
-	return s[:len(s)-1]
 }

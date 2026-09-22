@@ -135,9 +135,9 @@ type MaintenanceCreateParams struct {
 
 	Groupids []string `json:"groupids,omitempty"`
 	// Hosts name
-	HostNames   []string     `json:"-"`
-	HostIDs     []string     `json:"hostids"`
-	Timeperiods []Timeperiod `json:"timeperiods"`
+	HostNames   []string         `json:"-"`
+	HostIDs     []string         `json:"hostids"`
+	Timeperiods []Timeperiod     `json:"timeperiods"`
 	Tags        []MaintenanceTag `json:"tags,omitempty"`
 }
 
@@ -242,6 +242,38 @@ func (m *Maintenance) Delete(ctx context.Context) error {
 		return err
 	}
 	return nil
+}
+
+func (s *Session) updateMaintenanceHosts(ctx context.Context, maintenanceID string, hosts []Host) error {
+	var response MaintenanceCreateResponse
+
+	if s.ApiVersion.Major >= 6 {
+		params := struct {
+			MaintenanceID string `json:"maintenanceid"`
+			Hosts         jHosts `json:"hosts"`
+		}{
+			MaintenanceID: maintenanceID,
+			Hosts:         make(jHosts, 0, len(hosts)),
+		}
+		for _, host := range hosts {
+			params.Hosts = append(params.Hosts, jHost{HostID: host.HostID})
+		}
+
+		return s.Get(ctx, "maintenance.update", params, &response)
+	}
+
+	params := struct {
+		MaintenanceID string   `json:"maintenanceid"`
+		HostIDs       []string `json:"hostids"`
+	}{
+		MaintenanceID: maintenanceID,
+		HostIDs:       make([]string, 0, len(hosts)),
+	}
+	for _, host := range hosts {
+		params.HostIDs = append(params.HostIDs, host.HostID)
+	}
+
+	return s.Get(ctx, "maintenance.update", params, &response)
 }
 
 func (m *Maintenance) Update(ctx context.Context) (response MaintenanceCreateResponse, err error) {
